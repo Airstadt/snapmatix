@@ -146,23 +146,6 @@ export default function App() {
       setError("Please fill out all required fields");
       return;
     }
-    setError("");
-    setLoading(true);
-
-    const payload = {
-      mode: "onboarding", jobDate, customerName, customerCompany, customerEmail, customerPhone,
-      customerAddress, customerCity, customerState, customerZip, companyLocations, jobStartDate,
-      jobStartTime, jobCompletionDate, jobCompletionTime, jobType, jobPriority, estimatedHours,
-      estimatedCost, jobDescription, specialInstructions, assignedTeam, requiredMaterials,
-      paymentTerms, notes
-    };
-
-async function generate() {
-    // Basic validation
-    if (!jobDate || !customerName || !customerEmail || !customerAddress || !jobType || !jobDescription) {
-      setError("Please fill out all required fields");
-      return;
-    }
 
     setError("");
     setLoading(true);
@@ -177,7 +160,6 @@ async function generate() {
 
     try {
       console.log("--- Step 1: Requesting AI Summary from Cloudflare Tunnel ---");
-      
       const response = await fetch("https://api.snapmatrix.org/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -185,39 +167,29 @@ async function generate() {
       });
 
       const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Server error from backend");
-      }
+      if (!response.ok) throw new Error(data.error || "Server error from backend");
       
       const aiSummary = data.onboarding || "No result found.";
       setOutput(aiSummary);
-      console.log("--- Step 2: AI Summary Received! ---");
 
-      // --- FIREBASE DATA SENDER ---
-      console.log("--- Step 3: Sending to Firestore Collection: client_onboarding ---");
-      
-      const docRef = await addDoc(collection(db, "client_onboarding"), {
+      await addDoc(collection(db, "client_onboarding"), {
         ...payload,
         aiSummary: aiSummary,
         createdAt: serverTimestamp()
       });
 
-      console.log("--- Success! Saved to Firebase with ID: ", docRef.id);
-
     } catch (err) {
-      console.error("Full Error Context:", err);
       if (err.message.includes("permission-denied")) {
         setError("Firebase Error: Check your Firestore Database Rules.");
       } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-        // This triggers if the Tunnel or Backend is totally offline
-        setError("Network Error: Could not reach https://api.snapmatrix.org. Is your PM2 cloudflare process running?");
+        setError("Network Error: Could not reach https://api.snapmatrix.org.");
       } else {
         setError(`System Error: ${err.message}`);
       }
     } finally {
       setLoading(false);
     }
+  }
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", background: "#f0f2f5", padding: "40px 20px", fontFamily: "sans-serif" }}>
@@ -225,12 +197,42 @@ async function generate() {
         
         <header style={{ textAlign: "center", marginBottom: "30px" }}>
           <h1 style={{ color: colors.primary, fontSize: "32px", fontWeight: "800", margin: 0 }}>Client Onboarding</h1>
-          <p style={{ color: "#64748b", marginTop: "10px" }}>Generate professional job summaries for your team</p>
+          <p style={{ color: "#64748b", marginTop: "10px", marginBottom: "20px" }}>Generate professional job summaries for your team</p>
+          
+          <a 
+            href="https://snapcopy.online" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ 
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "8px 20px",
+              background: "white", 
+              color: colors.primary, 
+              border: `2px solid ${colors.primary}`, 
+              borderRadius: "30px", 
+              fontWeight: "bold", 
+              fontSize: "14px",
+              textDecoration: "none",
+              cursor: "pointer",
+              transition: "all 0.2s ease"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = colors.primary;
+              e.currentTarget.style.color = "white";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "white";
+              e.currentTarget.style.color = colors.primary;
+            }}
+          >
+            <span style={{ marginRight: "8px" }}>🚀</span> 
+            Visit SnapCopy AI
+          </a>
         </header>
 
         <div style={{ background: "white", padding: "30px", borderRadius: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.05)" }}>
           
-          {/* Section 1: Job Details */}
           <Section title="1. 📋 Job Details" color={colors.primary}>
             <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
               <FormField flex="1" minWidth="200px">
@@ -251,7 +253,6 @@ async function generate() {
             </div>
           </Section>
 
-          {/* Section 2: Customer Info */}
           <Section title="2. 👤 Customer Information" color={colors.primary}>
             <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
               <FormField flex="1" minWidth="200px">
@@ -277,7 +278,6 @@ async function generate() {
             </div>
           </Section>
 
-          {/* Section 3: Logistics */}
           <Section title="3. 📅 Schedule & Logistics" color={colors.primary}>
             <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
                 <FormField flex="1"><InputField label="Start Date" value={jobStartDate} onChange={setJobStartDate} type="date" getInputStyle={getInputStyle} /></FormField>
@@ -286,14 +286,12 @@ async function generate() {
             <InputField label="Our Office Location" value={companyLocations} onChange={setCompanyLocations} placeholder="Where is the team starting from?" getInputStyle={getInputStyle} />
           </Section>
 
-          {/* Section 4: Work Details */}
           <Section title="4. 🔧 Work Details" color={colors.primary}>
             <TextAreaField label="Job Description" value={jobDescription} onChange={setJobDescription} placeholder="What needs to be done?" getInputStyle={getInputStyle} />
             <TextAreaField label="Special Instructions" value={specialInstructions} onChange={setSpecialInstructions} placeholder="Gate codes, parking, etc." getInputStyle={getInputStyle} />
             <InputField label="Assigned Team" value={assignedTeam} onChange={setAssignedTeam} placeholder="Technician names" getInputStyle={getInputStyle} />
           </Section>
 
-          {/* Buttons */}
           <div style={{ display: "flex", gap: "10px" }}>
             <button onClick={generate} disabled={loading} style={{ flex: 2, padding: "16px", background: colors.primary, color: "white", border: "none", borderRadius: "10px", fontWeight: "bold", cursor: "pointer", opacity: loading ? 0.6 : 1 }}>
               {loading ? "Generating & Saving..." : "Generate Onboarding Summary"}
@@ -305,7 +303,6 @@ async function generate() {
 
           {error && <p style={{ color: colors.errorRed, textAlign: "center", marginTop: "15px", fontWeight: "600" }}>{error}</p>}
 
-          {/* Output Area */}
           {output && (
             <div style={{ marginTop: "30px", borderTop: "2px solid #f1f5f9", paddingTop: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px", alignItems: "center" }}>
