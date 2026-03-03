@@ -176,9 +176,9 @@ async function generate() {
     };
 
     try {
-      console.log("--- Step 1: Requesting AI Summary from Local Backend ---");
+      console.log("--- Step 1: Requesting AI Summary from Cloudflare Tunnel ---");
       
-      const response = await fetch("http://api.snapmatrix.org/generate", {
+      const response = await fetch("https://api.snapmatrix.org/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -195,24 +195,22 @@ async function generate() {
       console.log("--- Step 2: AI Summary Received! ---");
 
       // --- FIREBASE DATA SENDER ---
-      console.log("--- Step 3: Sending data to Firestore collection: 'client_onboarding' ---");
+      console.log("--- Step 3: Sending to Firestore Collection: client_onboarding ---");
       
       const docRef = await addDoc(collection(db, "client_onboarding"), {
-        ...payload,              // Sends all form fields
-        aiSummary: aiSummary,    // Sends the generated text from Ollama
-        createdAt: serverTimestamp() // Adds the server time
+        ...payload,
+        aiSummary: aiSummary,
+        createdAt: serverTimestamp()
       });
 
-      console.log("--- Success! Data saved with ID: ", docRef.id);
+      console.log("--- Success! Saved to Firebase with ID: ", docRef.id);
 
     } catch (err) {
-      console.error("Full Error Context:", err);
-      
-      // Specifically check if it's a Firebase permission error
+      console.error("Error details:", err);
       if (err.message.includes("permission-denied")) {
-        setError("Firebase Error: Check your Firestore Database Rules (allow read, write: if true).");
+        setError("Firebase Error: Permission Denied. Check your Firestore Rules.");
       } else {
-        setError("Process failed. Ensure local server (port 3000) is running and Firebase is connected.");
+        setError("System Error: Could not reach AI or Firebase. Check console.");
       }
     } finally {
       setLoading(false);
