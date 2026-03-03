@@ -206,16 +206,18 @@ async function generate() {
       console.log("--- Success! Saved to Firebase with ID: ", docRef.id);
 
     } catch (err) {
-      console.error("Error details:", err);
+      console.error("Full Error Context:", err);
       if (err.message.includes("permission-denied")) {
-        setError("Firebase Error: Permission Denied. Check your Firestore Rules.");
+        setError("Firebase Error: Check your Firestore Database Rules.");
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        // This triggers if the Tunnel or Backend is totally offline
+        setError("Network Error: Could not reach https://api.snapmatrix.org. Is your PM2 cloudflare process running?");
       } else {
-        setError("System Error: Could not reach AI or Firebase. Check console.");
+        setError(`System Error: ${err.message}`);
       }
     } finally {
       setLoading(false);
     }
-  }
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", background: "#f0f2f5", padding: "40px 20px", fontFamily: "sans-serif" }}>
