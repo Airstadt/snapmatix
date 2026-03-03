@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -10,8 +10,5 @@ const firebaseConfig = {
   appId: "1:297322776876:web:997461d305b80b2e888489"
 };
 
-// Check if a Firebase app is already initialized to prevent the '[DEFAULT]' error
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Initialize Firestore WITHOUT the "MSaaS" string
-export const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app); // Export Firestore instance for use in other modules

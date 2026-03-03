@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// --- FIREBASE ADDITIONS ---
+import { db } from "./firebase"; 
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 // --- COMPONENT HELPERS ---
 function Section({ title, color, children }) {
@@ -57,6 +60,11 @@ function TextAreaField({ label, value, onChange, placeholder, getInputStyle }) {
 }
 
 export default function App() {
+  // --- SEO INJECTION ---
+  useEffect(() => {
+    document.title = "Client Onboarding Tool | SnapCopy AI";
+  }, []);
+
   // --- STATE ---
   const [jobDate, setJobDate] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -149,17 +157,63 @@ export default function App() {
       paymentTerms, notes
     };
 
+async function generate() {
+    // Basic validation
+    if (!jobDate || !customerName || !customerEmail || !customerAddress || !jobType || !jobDescription) {
+      setError("Please fill out all required fields");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    const payload = {
+      mode: "onboarding", jobDate, customerName, customerCompany, customerEmail, customerPhone,
+      customerAddress, customerCity, customerState, customerZip, companyLocations, jobStartDate,
+      jobStartTime, jobCompletionDate, jobCompletionTime, jobType, jobPriority, estimatedHours,
+      estimatedCost, jobDescription, specialInstructions, assignedTeam, requiredMaterials,
+      paymentTerms, notes
+    };
+
     try {
-      const response = await fetch("http://localhost:3000/generate", {
+      console.log("--- Step 1: Requesting AI Summary from Local Backend ---");
+      
+      const response = await fetch("http://api.snapmatrix.org/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Server error");
-      setOutput(data.onboarding || "No result found.");
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Server error from backend");
+      }
+      
+      const aiSummary = data.onboarding || "No result found.";
+      setOutput(aiSummary);
+      console.log("--- Step 2: AI Summary Received! ---");
+
+      // --- FIREBASE DATA SENDER ---
+      console.log("--- Step 3: Sending data to Firestore collection: 'client_onboarding' ---");
+      
+      const docRef = await addDoc(collection(db, "client_onboarding"), {
+        ...payload,              // Sends all form fields
+        aiSummary: aiSummary,    // Sends the generated text from Ollama
+        createdAt: serverTimestamp() // Adds the server time
+      });
+
+      console.log("--- Success! Data saved with ID: ", docRef.id);
+
     } catch (err) {
-      setError("Backend not reached. Is your local server running on port 3000?");
+      console.error("Full Error Context:", err);
+      
+      // Specifically check if it's a Firebase permission error
+      if (err.message.includes("permission-denied")) {
+        setError("Firebase Error: Check your Firestore Database Rules (allow read, write: if true).");
+      } else {
+        setError("Process failed. Ensure local server (port 3000) is running and Firebase is connected.");
+      }
     } finally {
       setLoading(false);
     }
@@ -242,7 +296,7 @@ export default function App() {
           {/* Buttons */}
           <div style={{ display: "flex", gap: "10px" }}>
             <button onClick={generate} disabled={loading} style={{ flex: 2, padding: "16px", background: colors.primary, color: "white", border: "none", borderRadius: "10px", fontWeight: "bold", cursor: "pointer", opacity: loading ? 0.6 : 1 }}>
-              {loading ? "Generating..." : "Generate Onboarding Summary"}
+              {loading ? "Generating & Saving..." : "Generate Onboarding Summary"}
             </button>
             <button onClick={clearForm} style={{ flex: 1, padding: "16px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: "10px", fontWeight: "bold", cursor: "pointer" }}>
               Clear
